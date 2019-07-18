@@ -28,17 +28,24 @@ NUM_PIXELS = len(cpx.pixels)
 class State:
 
     def __init__(self):
-        self.lock = False
-        self.clicks = 0
+        self._clicks = 0
+
+    @property
+    def clicks(self):
+        return self._clicks
+
+    @clicks.setter
+    def clicks(self, clicks):
+        self._clicks = clicks
+        cpx.pixels[0:NUM_PIXELS] = self.colors
 
     def increase_timer(self):
         self.clicks += 1
-        return self.colors()
 
     def decrease_timer(self):
         self.clicks -= 1
-        return self.colors()
 
+    @property
     def colors(self):
         base_color = self.clicks // NUM_PIXELS
         base_color = base_color % len(COLORS)
@@ -83,15 +90,18 @@ def main():
     af.switch_to_output(value=False)
 
     state = State()
-    cpx.pixels[0:NUM_PIXELS] = state.colors()
+    cpx.pixels[0:NUM_PIXELS] = state.colors
+    button_a_lock = False
+    button_b_lock = False
     while True:
-        if cpx.button_a:
-            if not state.lock:
-                state.lock = True
-                cpx.pixels[0:NUM_PIXELS] = state.increase_timer()
-        else:
-            state.lock = False
-        if cpx.button_b:
+        if not cpx.button_a:
+            button_a_lock = False
+        if not cpx.button_b:
+            button_b_lock = False
+        if cpx.button_a and not button_a_lock:
+            button_a_lock = True
+            state.increase_timer()
+        if cpx.button_b and not button_b_lock:
             with hold_down(shutter):
                 while state.clicks > 0:
                     if cpx.switch:
@@ -99,12 +109,12 @@ def main():
                     else:
                         cpx.pixels.brightness = PIXEL_OFF
                     if cpx.button_a:
-                        state.lock = True
+                        button_a_lock = True
                         state.clicks = 0
-                        cpx.pixels[0:NUM_PIXELS] = state.colors()
                         break # give a way to bail other than yanking the cord from the camera
                     time.sleep(exposure_time)
-                    cpx.pixels[0:NUM_PIXELS] = state.decrease_timer()
+                    state.decrease_timer()
+
         if cpx.tapped:
             if exposure_time == TIMER_INCREMENT_SHORT:
                 exposure_time = TIMER_INCREMENT_LONG
